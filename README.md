@@ -1,12 +1,12 @@
 # RestFullPlayerApi
 
-A Laravel 9 REST API for managing football/soccer player rosters and their skill ratings, plus an automatic team-selection engine that assembles the strongest possible team from a set of position + main-skill requirements. Each player carries a `name`, a `position` (`defender`, `midfielder`, `forward`), and one or more skill ratings (`defense`, `attack`, `speed`, `stamina`, `strength`) with a numeric value. The API exposes a complete player CRUD workflow and a `POST /api/team/process` endpoint that ranks and selects players deterministically — ordering candidates by their value in the requested main skill and falling back to their highest-rated skill when the requested skill is absent. It is a backend-only, framework-conventional Laravel application backed by SQLite, with no third-party frontend.
+A Laravel 9 REST API built for a backend coding challenge. It manages a roster of football/soccer players — each with a `name`, a `position` (`defender`, `midfielder`, `forward`), and a set of skill ratings (`defense`, `attack`, `speed`, `stamina`, `strength`) — and exposes a team-selection endpoint that builds the strongest possible team from position and main-skill requirements. Candidates are ranked deterministically by their value in the requested main skill, falling back to a player's highest skill when the requested skill is absent. The project is a backend-only API backed by SQLite, with no frontend.
 
 ---
 
 ## Overview
 
-A backend-only REST API built with Laravel 9 and SQLite. It manages a football/soccer roster where each player has a position and a set of skill ratings, and it exposes an automatic team-selection engine that builds the strongest possible team from position + main-skill requirements. The API is intentionally lightweight: a single controller, two Eloquent models, two PHP enums for domain values, and a small but focused feature-test suite.
+The API exposes complete player CRUD plus an automated team-selection endpoint. Players and their skills live in two related SQLite tables; the team-selection endpoint reads that roster and applies a ranking strategy to assemble a team that satisfies a set of position + main-skill requirements, while ensuring no player is selected more than once. Built on Laravel 9 with PHP 8.1 and tested with PHPUnit against an in-memory database.
 
 ---
 
@@ -24,13 +24,13 @@ A backend-only REST API built with Laravel 9 and SQLite. It manages a football/s
 
 ```mermaid
 flowchart LR
-    CLIENT[HTTP Client / cURL / Tests] -->|JSON over HTTP| API[Laravel API /api/*]
-    API --> CTRL[PlayerController]
+    CLIENT[HTTP Client / cURL / Tests] -->|JSON over HTTP| ROUTES[Laravel API routes /api/*]
+    ROUTES --> CTRL[Controllers]
     CTRL --> MOD[Player & PlayerSkill models]
     MOD --> DB[(SQLite database)]
 ```
 
-Player management flows through a single controller over two related tables. Skills are eager-loaded on every player model, so reads and writes always ship the full nested structure.
+Requests are routed from the `/api` prefix to controllers, which delegate to the `Player` and `PlayerSkill` Eloquent models. Skills are eager-loaded on every player model, so reads and writes always return the full nested structure.
 
 ---
 
@@ -163,28 +163,26 @@ Response `200`:
 | -------------- | ---------------------------- | ----------------------- |
 | Language       | PHP                          | `^8.1` (`composer.json`) |
 | Framework      | Laravel                      | `^9.14` (`composer.json`) |
-| Authentication | Laravel Sanctum              | `^2.15` (`composer.json`) |
+| API auth       | Config-driven bearer token   | `PLAYER_API_TOKEN`      |
 | CORS           | fruitcake/laravel-cors       | `^3.0` (`composer.json`) |
 | HTTP client    | guzzlehttp/guzzle            | `^7.4.3` (`composer.json`) |
 | Database       | SQLite                       | —                       |
 | Testing        | PHPUnit                      | `^9.5.20` (`composer.json`) |
 
+> Laravel Sanctum (`^2.15`) is included as part of the standard Laravel scaffold (it backs the default `/api/user` route), but the API's protected operations use a configuration-driven bearer token.
+
 ---
 
 ## Database
 
-- **Engine:** SQLite. A ready, migrated database ships at `database/database.sqlite`. PHPUnit tests run against an in-memory SQLite database (`:memory:`, see `phpunit.xml`), so tests never touch the on-disk file.
+The project uses SQLite. A ready, migrated database ships at `database/database.sqlite`. Tests run against an in-memory SQLite database (`:memory:`), so they never touch the on-disk file.
 
-### Tables
+Two domain tables model the roster:
 
 | Table | Key columns |
 | ----- | ----------- |
 | `players` | `id` (PK), `name`, `position`, `created_at`, `updated_at` |
 | `player_skills` | `id` (PK), `skill`, `value`, `player_id` (FK → `players.id`, cascade delete) |
-| `users` / `personal_access_tokens` | Laravel Sanctum scaffolding |
-| `password_resets` / `failed_jobs` | Laravel scaffolding |
-
-### Relationship
 
 ```mermaid
 erDiagram
@@ -202,7 +200,7 @@ erDiagram
     }
 ```
 
-`Player` has many `PlayerSkill` (eager-loaded by default). Skills are replaced on update and cascaded on player delete.
+`Player` has many `PlayerSkill`, eager-loaded by default. Skills are replaced on update and cascaded on player delete. (The remaining scaffold tables — `users`, `personal_access_tokens`, `password_resets`, `failed_jobs` — are standard Laravel defaults and not used by this API.)
 
 ---
 
