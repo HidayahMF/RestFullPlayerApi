@@ -192,6 +192,8 @@ class PlayerController extends Controller
                 'value' => $skill['value'],
             ]);
         }
+
+        $player->refresh();
     }
 
   
@@ -218,7 +220,7 @@ class PlayerController extends Controller
     public function destroy(Request $request, $id)
     {
         $token = $request->bearerToken();
-        $expectedToken = 'SkFabTZibXE1aE14ckpQUUxHc2dnQ2RzdlFRTTM2NFE2cGI4d3RQNjZmdEFITmdBQkE=';
+        $expectedToken = config('services.player_api_token');
 
         if ($token !== $expectedToken) {
             return response()->json([

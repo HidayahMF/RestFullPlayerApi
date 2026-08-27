@@ -30,4 +30,17 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Player API
+    |--------------------------------------------------------------------------
+    |
+    | Token used to authorize the DELETE player endpoint. Read from
+    | configuration / environment rather than being hard-coded in the
+    | controller. The default preserves the value expected by the challenge
+    | test harness; override via the PLAYER_API_TOKEN environment variable.
+    |
+    */
+    'player_api_token' => env('PLAYER_API_TOKEN', 'SkFabTZibXE1aE14ckpQUUxHc2dnQ2RzdlFRTTM2NFE2cGI4d3RQNjZmdEFITmdBQkE='),
+
 ];
