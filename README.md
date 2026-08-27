@@ -4,13 +4,19 @@ A Laravel 9 REST API for managing football/soccer player rosters and their skill
 
 ---
 
-## Features
+## Overview
+
+A backend-only REST API built with Laravel 9 and SQLite. It manages a football/soccer roster where each player has a position and a set of skill ratings, and it exposes an automatic team-selection engine that builds the strongest possible team from position + main-skill requirements. The API is intentionally lightweight: a single controller, two Eloquent models, two PHP enums for domain values, and a small but focused feature-test suite.
+
+---
+
+## Key Features
 
 - **Player CRUD** — list, fetch, create, update, and delete players.
 - **Player skills** — each player has one or more named skills with a numeric value, returned in a consistent nested structure.
 - **Team selection** — ranked, non-repeating selection of players from position + main-skill requirements.
 - **Validation** — restricts position/skill values, requires at least one skill, rejects duplicate skills and duplicate requirement combinations, and refuses insufficient roster depth.
-- **Authentication** — the `DELETE` endpoint is protected by a configuration-driven bearer token; Sanctum provides the default `/api/user` route.
+- **Token-based protection** — destructive operations (delete) require a configuration-driven bearer token.
 
 ---
 
@@ -151,7 +157,7 @@ Response `200`:
 
 ---
 
-## Tech Stack
+## Technology Stack
 
 | Layer          | Technology                   | Version (source)        |
 | -------------- | ---------------------------- | ----------------------- |
@@ -284,7 +290,7 @@ The suite (in-memory SQLite) covers:
 - **`.env` usage** — `.env` is git-ignored and untracked; only the secret-free `.env.example` is committed. Never commit real tokens or keys.
 - **CORS** — permissive for all origins so the public API is consumable from any client; tighten `allowed_origins` in production if needed.
 - **Rate limiting** — API routes are throttled at 60 requests/minute per IP.
-- **Sanctum** — installed; provides the default `GET /api/user` route. Player CRUD and team endpoints are intentionally unauthenticated (except `DELETE`).
+- **Access model** — player reads/writes and team selection are public by design; only the destructive `DELETE` endpoint is token-protected.
 
 ---
 
