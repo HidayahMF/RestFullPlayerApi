@@ -316,3 +316,7 @@ The suite (in-memory SQLite) covers:
 ## Author
 
 **Hidayah MF** — GitHub: [@HidayahMF](https://github.com/HidayahMF)
+
+## Development documentation
+
+- [Development pipeline](docs/development-pipeline.md) — code-grounded flow, source map, declared commands, validation plan, and current limitations.
