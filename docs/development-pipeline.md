@@ -1,123 +1,134 @@
-# RestFullPlayerApi — Development Pipeline
+# ⚽ RestFullPlayerApi — Engineering Blueprint
 
-> Code-grounded architecture and delivery guide for the current repository snapshot. Reviewed from `main` at `d018da4be725` on 2026-09-17.
+> **Laravel player-service pipeline:** validated player CRUD, skill persistence, and rule-based team selection.
 
-RestFullPlayerApi is a Laravel API for player CRUD and team selection based on position and main-skill requirements.
+**Reviewed snapshot:** `main` @ [`d018da4be725`](https://github.com/HidayahMF/RestFullPlayerApi/commit/d018da4be72567866e54fa61e57e9a731117e223) — 2026-09-17
 
-## 1. API architecture
+## ⚡ System snapshot
+
+| Area | Implementation |
+| --- | --- |
+| API | Laravel |
+| Persistence | Eloquent player + skill records |
+| Core domain | Player CRUD + team selection |
+| Automated tests | Focused Laravel feature tests |
+| CI | No `.github/workflows/` found in reviewed snapshot |
+
+## 🏗️ API architecture
 
 ```mermaid
 flowchart LR
-    C[API Client] --> R[routes/api.php]
-    R --> P[PlayerController]
-    P --> V[Validation]
-    V --> DB[(Players + Skills)]
-    P --> TEAM[Team Selection Logic]
-    TEAM --> DB
+    CLIENT[API Client] --> ROUTES[routes/api.php]
+    ROUTES --> CTRL[PlayerController]
+    CTRL --> VALID[Validation]
+    VALID --> DB[(Players + Skills)]
+    CTRL --> SELECT[Team-selection logic]
+    SELECT --> DB
+    DB --> RESPONSE[JSON response]
 ```
 
-## 2. Player CRUD pipeline
+## 👤 Player write flow
 
 ```mermaid
 flowchart TD
-    REQ[Player Request] --> VAL[Validate Position + Skills]
-    VAL --> DUP{Duplicate skill?}
-    DUP -->|Yes| ERR[Validation Error]
-    DUP -->|No| WRITE[Create / Update Player]
-    WRITE --> SKILL[Write Skill Records]
-    SKILL --> RES[Return Player]
+    REQ[Create / update request] --> ENUM[Validate position + skill enums]
+    ENUM --> DUP{Duplicate skill?}
+    DUP -->|Yes| ERROR[Validation response]
+    DUP -->|No| PLAYER[Write player]
+    PLAYER --> SKILLS[Write skill records]
+    SKILLS --> DONE[Return result]
 ```
 
-## 3. Team-selection pipeline
+## 🧠 Team-selection engine
 
 ```mermaid
 flowchart TD
-    INPUT[Requested Positions / Skills] --> ELIGIBLE[Find Eligible Players]
-    ELIGIBLE --> RANK[Rank by Requested Skill]
-    RANK --> FALLBACK[Fallback to Highest Skill]
-    FALLBACK --> UNIQUE[Exclude Already Selected IDs]
-    UNIQUE --> QUERY[Fetch Selected Players]
-    QUERY --> RESULT[Team Response]
+    INPUT[Requested formation / skills] --> CANDIDATES[Find eligible players]
+    CANDIDATES --> REQUESTED[Rank requested skill]
+    REQUESTED --> FALLBACK[Fallback to strongest skill]
+    FALLBACK --> UNIQUE[Exclude already-selected IDs]
+    UNIQUE --> FETCH[Fetch selected records]
+    FETCH --> TEAM[Return team]
 ```
 
-The reviewed implementation creates an intermediate ranking, but the final retrieval query does not necessarily preserve that ranking order.
+> The reviewed code builds a ranking before the final fetch, but the final query does **not necessarily preserve that ranking order**. Treat output ordering as something to verify explicitly.
 
-## 4. Runtime ownership
+## 🗺️ Code ownership map
 
-| Layer | Responsibility | Key source |
+| Source | Owns |
+| --- | --- |
+| [`routes/api.php`](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/routes/api.php) | API endpoints + middleware placement |
+| [`PlayerController.php`](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/app/Http/Controllers/PlayerController.php) | CRUD + team-selection behavior |
+| [`tests/Feature/TeamControllerTest.php`](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Feature/TeamControllerTest.php) | Team behavior regression coverage |
+| `tests/Feature/*Player*` | Player CRUD behavior |
+
+## 🚀 Developer → release pipeline
+
+```mermaid
+flowchart LR
+    A[Change request] --> B[Trace route + controller rule]
+    B --> C[Implement focused change]
+    C --> D[Prepare isolated DB]
+    D --> E[Run feature tests]
+    E --> F[Edge-case team scenarios]
+    F --> G[Auth / route review]
+    G --> H[PR review]
+    H --> I[Deploy API]
+    I --> J[CRUD + team smoke test]
+```
+
+## 🛡️ Quality gates
+
+| Gate | Must prove |
+| --- | --- |
+| Validation | Invalid position/skill values are rejected |
+| Data integrity | Duplicate skills cannot slip through |
+| CRUD | Create/update/delete produce expected relationships |
+| Authorization | Protected operations reject unauthorized access |
+| Selection | Requested-skill ranking behaves as designed |
+| Fallback | Highest-skill fallback is deterministic |
+| Uniqueness | Same player is never selected twice |
+| Capacity | Insufficient-player scenarios return predictable output |
+| Ordering | Final team order matches product expectation |
+| Failure safety | Multi-record writes do not leave unexpected partial state |
+
+## 🔐 Route protection map
+
+```mermaid
+flowchart TD
+    REQ[Incoming API request] --> R{Route group}
+    R -->|/user| S[Sanctum middleware]
+    R -->|Player endpoints| P[Player routes]
+    P --> C[Controller behavior]
+```
+
+Only `/user` uses Sanctum middleware in the inspected routes. Do not infer equivalent protection for player endpoints unless the routes are changed.
+
+## ⚠️ Risk radar
+
+| Priority | Finding | Impact |
 | --- | --- | --- |
-| Routes | API endpoint mapping | `routes/api.php` |
-| Controller | CRUD + team-selection logic | `app/Http/Controllers/PlayerController.php` |
-| Eloquent | Player/skill persistence | Laravel models |
-| Tests | Player/team behavior | `tests/Feature/` |
+| 🔴 High | Player endpoints do not share inspected Sanctum guard | Security expectations can differ from actual routing |
+| 🟠 Medium | Final fetch may lose ranking order | Selected team may be correct but returned order may surprise clients |
+| 🟠 Medium | Player + skill writes span multiple records | Partial failure behavior should be tested |
+| 🟡 Low | No GitHub Actions workflow found | Test discipline is procedural unless CI is added |
 
-## 5. Development pipeline
-
-```mermaid
-flowchart LR
-    SRC[Pull source] --> ENV[Configure .env]
-    ENV --> DB[Prepare isolated DB]
-    ENV --> PHP[Composer install]
-    PHP --> MIGRATE[Migrate / seed fixture data]
-    MIGRATE --> API[Run Laravel API]
-    API --> TEST[Feature tests]
-    TEST --> REVIEW[Review]
-```
-
-The inspected `package.json` exposes `npm run dev`, but the application behavior is primarily Laravel/PHP and should be validated through the PHP test/runtime tooling actually configured in the project.
-
-## 6. Verification gates
-
-Validate at minimum:
-
-- Player create with valid and invalid position/skill enums.
-- Duplicate-skill rejection.
-- Player update preserving expected relationships.
-- Unauthorized deletion.
-- Team request with missing eligible players.
-- Not enough players for a requested formation.
-- Highest-skill fallback behavior.
-- Same player never reused twice in one team.
-- Final team ordering matches product expectations.
-- Multi-record writes behave consistently if one write fails.
-
-The repository contains focused feature tests for player CRUD and team selection; run them against isolated data before release.
-
-## 7. Security path
+## 🌐 Release smoke path
 
 ```mermaid
 flowchart TD
-    REQ[API Request] --> ROUTE{Route}
-    ROUTE -->|/user| SANCTUM[Sanctum Middleware]
-    ROUTE -->|Player endpoints| PLAYER[Player Route]
-    PLAYER --> CTRL[Controller-level behavior]
+    TEST[Feature tests pass] --> DB[Schema / migration check]
+    DB --> DEPLOY[Deploy Laravel API]
+    DEPLOY --> CRUD[Create + update fixture player]
+    CRUD --> TEAM[Run representative team request]
+    TEAM --> AUTH[Test protected/unauthorized path]
+    AUTH --> OK{Expected results?}
+    OK -->|Yes| DONE[Release verified]
+    OK -->|No| ROLLBACK[Investigate / rollback]
 ```
 
-Only `/user` uses Sanctum middleware in the inspected routes. Do not assume the same guard protects the player endpoints unless routing changes.
+---
 
-## 8. Release pipeline
+### Keeping this blueprint accurate
 
-```mermaid
-flowchart LR
-    PR[Reviewed PR] --> TEST[Feature tests]
-    TEST --> DB[Migration/schema check]
-    DB --> API[Deploy Laravel API]
-    API --> SMOKE[CRUD + Team smoke test]
-```
-
-No GitHub Actions workflow was found in the reviewed snapshot.
-
-## 9. Known gaps
-
-1. Player endpoints do not share the inspected Sanctum guard used by `/user`.
-2. Final query ordering may differ from the intermediate ranking.
-3. Multi-record writes should be explicitly tested for rollback/partial failure.
-4. CI automation is not represented by `.github/workflows/` in this snapshot.
-
-## 10. Source map
-
-- [`routes/api.php`](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/routes/api.php)
-- [`app/Http/Controllers/PlayerController.php`](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/app/Http/Controllers/PlayerController.php)
-- [`tests/Feature/TeamControllerTest.php`](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Feature/TeamControllerTest.php)
-
-Keep this guide synchronized with route protection, validation enums, team-ranking rules, and persistence changes.
+Update this file when route middleware, validation enums, team-selection ranking, or player/skill persistence rules change.
