@@ -1,100 +1,123 @@
 # RestFullPlayerApi — Development Pipeline
 
-Laravel API for player CRUD and team selection by position and main skill.
+> Code-grounded architecture and delivery guide for the current repository snapshot. Reviewed from `main` at `d018da4be725` on 2026-09-17.
 
-> Source review: **2026-09-17**, branch `main`, commit [`d018da4be725`](https://github.com/HidayahMF/RestFullPlayerApi/commit/d018da4be72567866e54fa61e57e9a731117e223). This is a code-grounded implementation overview and development guide, not a reconstructed historical timeline or a claim that runtime tests passed.
+RestFullPlayerApi is a Laravel API for player CRUD and team selection based on position and main-skill requirements.
 
-## At a glance
+## 1. API architecture
 
-| Area | Finding |
-| --- | --- |
-| Review scope | Repository tree, dependency manifests, and selected entry points/domain implementations linked below |
-| Automated CI | No files under `.github/workflows/` in this source snapshot |
-| Validation performed | Static source and documentation review; application builds, tests, databases, and external services were not executed |
+```mermaid
+flowchart LR
+    C[API Client] --> R[routes/api.php]
+    R --> P[PlayerController]
+    P --> V[Validation]
+    V --> DB[(Players + Skills)]
+    P --> TEAM[Team Selection Logic]
+    TEAM --> DB
+```
 
-## Implemented flow
-
-1. routes/api.php dispatches player requests to PlayerController; create/update validate position and skill enums and reject duplicate skills.
-
-2. Player and skill records are written through Eloquent; delete checks a configured bearer token.
-
-3. processTeam ranks eligible players by requested skill with a highest-skill fallback, avoids reusing selected IDs, and returns the selected players.
-
-### Runtime map
+## 2. Player CRUD pipeline
 
 ```mermaid
 flowchart TD
- R["API request"] --> V{"Valid request?"}
- V -->|No| E["Validation error"]
- V -->|Yes| C["PlayerController"]
- C --> D[("Players and skills")]
- D --> T["Team selection or CRUD result"]
+    REQ[Player Request] --> VAL[Validate Position + Skills]
+    VAL --> DUP{Duplicate skill?}
+    DUP -->|Yes| ERR[Validation Error]
+    DUP -->|No| WRITE[Create / Update Player]
+    WRITE --> SKILL[Write Skill Records]
+    SKILL --> RES[Return Player]
 ```
 
-## Source map
+## 3. Team-selection pipeline
 
-Principal source files used for this overview, pinned to the reviewed commit:
+```mermaid
+flowchart TD
+    INPUT[Requested Positions / Skills] --> ELIGIBLE[Find Eligible Players]
+    ELIGIBLE --> RANK[Rank by Requested Skill]
+    RANK --> FALLBACK[Fallback to Highest Skill]
+    FALLBACK --> UNIQUE[Exclude Already Selected IDs]
+    UNIQUE --> QUERY[Fetch Selected Players]
+    QUERY --> RESULT[Team Response]
+```
 
-- [routes/api.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/routes/api.php)
-- [app/Http/Controllers/PlayerController.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/app/Http/Controllers/PlayerController.php)
-- [tests/Feature/TeamControllerTest.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Feature/TeamControllerTest.php)
+The reviewed implementation creates an intermediate ranking, but the final retrieval query does not necessarily preserve that ranking order.
 
-## Technology and commands
+## 4. Runtime ownership
 
-Version ranges below are declarations in source manifests, not independently verified installed versions.
-
-| Manifest | Relevant declarations |
-| --- | --- |
-| [composer.json](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/composer.json) | `php ^8.1`, `laravel/framework ^9.14` |
-| [package.json](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/package.json) | See manifest |
-
-Run each command from the indicated directory after installing the corresponding dependencies and configuring an isolated development environment. Commands are listed as declared; this review does not certify they succeed.
-
-| Directory | Command | Implementation |
+| Layer | Responsibility | Key source |
 | --- | --- | --- |
-| `.` | `npm run dev` | Declared: `npm run development` |
+| Routes | API endpoint mapping | `routes/api.php` |
+| Controller | CRUD + team-selection logic | `app/Http/Controllers/PlayerController.php` |
+| Eloquent | Player/skill persistence | Laravel models |
+| Tests | Player/team behavior | `tests/Feature/` |
 
-## Development sequence
+## 5. Development pipeline
 
-| Stage | Work | Completion evidence |
-| --- | --- | --- |
-| 1. Establish scope | Read the source map and limitations; choose one concrete behavior to change. | Expected input, output, and failure behavior. |
-| 2. Prepare environment | Use the manifests and configuration references. | Required local services reachable with synthetic data. |
-| 3. Implement | Follow the implemented flow and update the layer that owns the behavior. | Focused diff with matching caller/callee contracts. |
-| 4. Validate | Run applicable declared checks and the scenarios below. | Recorded commands, results, and untested dependencies. |
-| 5. Review and release | Review the diff and update documentation; release after environment checks. | Reviewed change and target-environment smoke check. |
+```mermaid
+flowchart LR
+    SRC[Pull source] --> ENV[Configure .env]
+    ENV --> DB[Prepare isolated DB]
+    ENV --> PHP[Composer install]
+    PHP --> MIGRATE[Migrate / seed fixture data]
+    MIGRATE --> API[Run Laravel API]
+    API --> TEST[Feature tests]
+    TEST --> REVIEW[Review]
+```
 
-These stages are a recommended maintenance sequence, not a historical timeline.
+The inspected `package.json` exposes `npm run dev`, but the application behavior is primarily Laravel/PHP and should be validated through the PHP test/runtime tooling actually configured in the project.
 
-## Configuration and runtime prerequisites
+## 6. Verification gates
 
-- [.env.example](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/.env.example)
-- [phpunit.xml](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/phpunit.xml)
+Validate at minimum:
 
-Configuration-file presence does not prove deployment success. Keep credentials outside version control and use synthetic records during setup.
+- Player create with valid and invalid position/skill enums.
+- Duplicate-skill rejection.
+- Player update preserving expected relationships.
+- Unauthorized deletion.
+- Team request with missing eligible players.
+- Not enough players for a requested formation.
+- Highest-skill fallback behavior.
+- Same player never reused twice in one team.
+- Final team ordering matches product expectations.
+- Multi-record writes behave consistently if one write fails.
 
-## Verification plan
+The repository contains focused feature tests for player CRUD and team selection; run them against isolated data before release.
 
-Run player and team feature tests with isolated data; verify missing players, duplicate skill requests, insufficient players, fallback ranking, and unauthorized deletion.
+## 7. Security path
 
-Test-related files found in the repository tree (9; inventory only, not a passing-test count):
+```mermaid
+flowchart TD
+    REQ[API Request] --> ROUTE{Route}
+    ROUTE -->|/user| SANCTUM[Sanctum Middleware]
+    ROUTE -->|Player endpoints| PLAYER[Player Route]
+    PLAYER --> CTRL[Controller-level behavior]
+```
 
-- [tests/CreatesApplication.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/CreatesApplication.php)
-- [tests/Feature/PlayerControllerBaseTest.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Feature/PlayerControllerBaseTest.php)
-- [tests/Feature/PlayerControllerCreateTest.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Feature/PlayerControllerCreateTest.php)
-- [tests/Feature/PlayerControllerDeleteTest.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Feature/PlayerControllerDeleteTest.php)
-- [tests/Feature/PlayerControllerListingTest.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Feature/PlayerControllerListingTest.php)
-- [tests/Feature/PlayerControllerUpdateTest.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Feature/PlayerControllerUpdateTest.php)
-- [tests/Feature/TeamControllerTest.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Feature/TeamControllerTest.php)
-- [tests/TestCase.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/TestCase.php)
-- [tests/Unit/ExampleTest.php](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Unit/ExampleTest.php)
+Only `/user` uses Sanctum middleware in the inspected routes. Do not assume the same guard protects the player endpoints unless routing changes.
 
-## Known limitations and next work
+## 8. Release pipeline
 
-Only /user uses Sanctum middleware in the inspected routes; player endpoints do not share that guard. Team selection builds an intermediate ranking but the final query need not preserve its order. Multi-record writes should be tested for rollback behavior.
+```mermaid
+flowchart LR
+    PR[Reviewed PR] --> TEST[Feature tests]
+    TEST --> DB[Migration/schema check]
+    DB --> API[Deploy Laravel API]
+    API --> SMOKE[CRUD + Team smoke test]
+```
 
-Prioritize the acceptance checks above before expanding the feature set. A declared test command or example test does not establish production readiness.
+No GitHub Actions workflow was found in the reviewed snapshot.
 
-## Keeping this document accurate
+## 9. Known gaps
 
-Update the source snapshot and affected flow when entry points, persistence, authentication, or integration contracts change. Keep planned capabilities separate from implemented behavior, and record actual build/test results only after running them.
+1. Player endpoints do not share the inspected Sanctum guard used by `/user`.
+2. Final query ordering may differ from the intermediate ranking.
+3. Multi-record writes should be explicitly tested for rollback/partial failure.
+4. CI automation is not represented by `.github/workflows/` in this snapshot.
+
+## 10. Source map
+
+- [`routes/api.php`](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/routes/api.php)
+- [`app/Http/Controllers/PlayerController.php`](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/app/Http/Controllers/PlayerController.php)
+- [`tests/Feature/TeamControllerTest.php`](https://github.com/HidayahMF/RestFullPlayerApi/blob/d018da4be72567866e54fa61e57e9a731117e223/tests/Feature/TeamControllerTest.php)
+
+Keep this guide synchronized with route protection, validation enums, team-ranking rules, and persistence changes.
